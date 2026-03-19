@@ -1,0 +1,185 @@
+{% extends "planting/base.html" %}
+{% block title %}Upload Data{% endblock %}
+{% block topbar_progress %}Upload Data{% endblock %}
+
+{% block content %}
+
+<div style="max-width:640px;margin:0 auto">
+
+  <!-- Upload Card -->
+  <div style="background:var(--white);border-radius:14px;padding:28px 30px;box-shadow:var(--shadow);margin-bottom:20px">
+    <div style="font-size:16px;font-weight:700;color:var(--g800);margin-bottom:4px">📤 Upload Weekly Planting Data</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:22px">Upload your Excel file — we'll validate it and let you know if anything needs fixing.</div>
+
+    <form method="POST" action="{% url 'upload_file' %}" enctype="multipart/form-data" id="uploadForm">
+      {% csrf_token %}
+
+      <!-- Drop zone -->
+      <div id="dropzone"
+           style="border:2px dashed {% if validation_errors %}#FECACA{% else %}var(--border){% endif %};
+                  border-radius:10px;padding:40px 24px;text-align:center;
+                  background:{% if validation_errors %}#FEF2F2{% else %}var(--bg){% endif %};
+                  cursor:pointer;transition:all 0.2s"
+           ondragover="event.preventDefault();this.style.borderColor='var(--g500)';this.style.background='var(--g50)'"
+           ondragleave="this.style.borderColor='{% if validation_errors %}#FECACA{% else %}var(--border){% endif %}';this.style.background='{% if validation_errors %}#FEF2F2{% else %}var(--bg){% endif %}'"
+           ondrop="handleDrop(event)"
+           onclick="document.getElementById('fileInput').click()">
+        <div style="font-size:36px;margin-bottom:10px">{% if validation_errors %}⚠️{% else %}📊{% endif %}</div>
+        <div style="font-size:15px;font-weight:600;color:var(--g800);margin-bottom:5px">
+          {% if uploaded_filename %}
+            {{ uploaded_filename }}
+          {% else %}
+            Drag & drop your Excel file here
+          {% endif %}
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px">
+          {% if validation_errors %}
+            Fix the errors below and upload again
+          {% else %}
+            or click to browse — .xlsx and .xls only
+          {% endif %}
+        </div>
+        <input type="file" name="excel_file" id="fileInput" accept=".xlsx,.xls"
+               style="display:none" onchange="showFile(this)">
+        <button type="button" class="btn btn-outline btn-sm"
+                onclick="event.stopPropagation();document.getElementById('fileInput').click()">
+          {% if validation_errors %}Choose Different File{% else %}Browse File{% endif %}
+        </button>
+        <div id="fileName" style="margin-top:10px;font-size:13px;color:var(--g700);font-weight:600"></div>
+      </div>
+
+      <!-- Submit button -->
+      <div style="margin-top:16px;display:flex;justify-content:flex-end">
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+          🔍 Validate & Upload
+        </button>
+      </div>
+    </form>
+
+    <!-- ── Inline error messages ─────────────────────────────────────────── -->
+    {% if validation_errors %}
+    <div style="margin-top:24px;border-top:1px solid #FECACA;padding-top:20px">
+
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="font-size:15px;font-weight:700;color:#991B1B">❌ Your file has {{ validation_errors|length }} issue{{ validation_errors|length|pluralize }} that need fixing</div>
+      </div>
+
+      <!-- Error list -->
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">
+        {% for e in validation_errors %}
+        <div style="display:flex;gap:12px;padding:12px 14px;background:#FEF2F2;
+                    border:1px solid #FECACA;border-radius:8px;align-items:flex-start">
+          <span style="color:#DC2626;font-size:14px;margin-top:1px;flex-shrink:0">●</span>
+          <div>
+            {% if e.row %}
+              <span style="background:#DC2626;color:#fff;font-size:10px;font-weight:700;
+                           padding:1px 7px;border-radius:4px;margin-right:6px">ROW {{ e.row }}</span>
+            {% endif %}
+            {% if e.field %}
+              <span style="background:#FEE2E2;color:#991B1B;font-size:10px;font-weight:700;
+                           padding:1px 7px;border-radius:4px;font-family:'DM Mono',monospace;
+                           margin-right:6px">{{ e.field }}</span>
+            {% endif %}
+            <span style="font-size:13px;color:#7F1D1D">{{ e.message }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Fix instructions -->
+      <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;
+                  padding:14px 16px;font-size:13px;color:#78350F">
+        <strong>How to fix:</strong>
+        <ol style="margin-top:8px;padding-left:18px;line-height:2">
+          <li>Open your Excel file</li>
+          <li>Go to the rows listed above and correct the values</li>
+          <li>Make sure dates are in <code style="background:#FEF3C7;padding:1px 5px;border-radius:3px">YYYY-MM-DD</code> format (e.g. 2026-03-17)</li>
+          <li>Make sure numbers like qty and labor cost contain only digits</li>
+          <li>Make sure the same week + season + field does not appear more than once</li>
+          <li>Save the file and upload it again above</li>
+        </ol>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Recent Uploads -->
+  {% if recent_batches %}
+  <div style="background:var(--white);border-radius:14px;box-shadow:var(--shadow);overflow:hidden">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);
+                display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:14px;font-weight:700;color:var(--g800)">🕐 Recent Uploads</div>
+      <a href="{% url 'manage_uploads' %}" style="font-size:12px;color:var(--g700);font-weight:600;text-decoration:none">
+        Manage all →
+      </a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Date</th>
+          <th>Rows</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in recent_batches %}
+        <tr>
+          <td style="font-size:12px;font-weight:500">{{ b.filename }}</td>
+          <td style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">
+            {{ b.uploaded_at|date:"d M H:i" }}
+          </td>
+          <td style="font-size:13px">{{ b.row_count }}</td>
+          <td>
+            <span class="pill
+              {% if b.status == 'validated' or b.status == 'imported' %}pill-GREEN
+              {% elif b.status == 'errors' %}pill-RED
+              {% else %}pill-ORANGE{% endif %}">
+              {{ b.get_status_display }}
+            </span>
+          </td>
+          <td>
+            <a href="{% url 'upload_result' b.id %}" class="btn btn-outline btn-sm">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showFile(input) {
+  const name = input.files[0] ? input.files[0].name : '';
+  if (name) {
+    document.getElementById('fileName').textContent = '📄 ' + name;
+    document.getElementById('dropzone').style.borderColor = 'var(--g500)';
+    document.getElementById('dropzone').style.background  = 'var(--g50)';
+  }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const dt  = new DataTransfer();
+  dt.items.add(file);
+  const inp = document.getElementById('fileInput');
+  inp.files = dt.files;
+  showFile(inp);
+}
+
+// Show loading state on submit
+document.getElementById('uploadForm').addEventListener('submit', function() {
+  const btn = document.getElementById('submitBtn');
+  btn.textContent = '⏳ Validating...';
+  btn.disabled = true;
+});
+</script>
+{% endblock %}

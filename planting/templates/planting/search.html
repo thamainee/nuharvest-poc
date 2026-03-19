@@ -1,0 +1,63 @@
+{% extends "planting/base.html" %}
+{% block title %}Search{% endblock %}
+{% block page_title %}Search Records{% endblock %}
+
+{% block content %}
+
+<div class="card mb-24">
+  <div class="section-title" style="margin-bottom:14px">🔍 Search Planting Records</div>
+  <form action="{% url 'search' %}" method="GET" style="display:flex;gap:10px">
+    <input type="text" name="q" value="{{ q }}"
+           placeholder="Search by week, crop name, or notes…"
+           style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;
+                  font-family:inherit;font-size:14px;color:var(--text)"
+           autofocus>
+    <button type="submit" class="btn btn-primary">Search</button>
+    {% if q %}<a href="{% url 'search' %}" class="btn btn-outline">Clear</a>{% endif %}
+  </form>
+</div>
+
+{% if q %}
+  {% if results %}
+  <div class="card">
+    <div class="section-title" style="margin-bottom:12px">
+      Found {{ results|length }} result(s) for "<strong>{{ q }}</strong>"
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Week</th><th>Date</th><th>Crop</th>
+          <th>Labor Cost</th><th>Qty Planted</th><th>Target Qty</th><th>Notes</th>
+        </tr></thead>
+        <tbody>
+          {% for r in results %}
+          <tr>
+            <td>{{ r.week }}</td>
+            <td style="font-family:'DM Mono',monospace;font-size:12px">{{ r.date }}</td>
+            <td><strong>{{ r.crop }}</strong></td>
+            <td>R{{ r.labor_cost }}</td>
+            <td>{{ r.qty_planted }}</td>
+            <td>{{ r.target_qty }}</td>
+            <td style="font-size:12px;color:var(--text-muted)">{{ r.notes|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="text-align:center;padding:48px">
+    <div style="font-size:40px;margin-bottom:12px">🌱</div>
+    <div style="font-size:16px;font-weight:600;color:var(--green-dark);margin-bottom:6px">No records found</div>
+    <div style="font-size:13px;color:var(--text-muted)">No planting records match "<strong>{{ q }}</strong>"</div>
+  </div>
+  {% endif %}
+{% else %}
+<div class="card" style="text-align:center;padding:48px">
+  <div style="font-size:40px;margin-bottom:12px">🔍</div>
+  <div style="font-size:16px;font-weight:600;color:var(--green-dark);margin-bottom:6px">Search your planting data</div>
+  <div style="font-size:13px;color:var(--text-muted)">Enter a search term above to find records by week, crop, or notes.</div>
+</div>
+{% endif %}
+
+{% endblock %}

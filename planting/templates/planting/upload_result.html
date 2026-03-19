@@ -1,0 +1,106 @@
+{% extends "planting/base.html" %}
+{% block title %}Validation Result{% endblock %}
+{% block topbar_progress %}Validation Result{% endblock %}
+
+{% block content %}
+
+<!-- Status Card -->
+<div style="background:var(--white);border-radius:12px;padding:18px 22px;box-shadow:var(--shadow);margin-bottom:18px;
+            border-left:4px solid {% if batch.status == 'validated' or batch.status == 'imported' %}var(--status-green){% else %}var(--red){% endif %}">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:4px">
+        {% if batch.status == 'validated' %}✅ Valid — Ready to Import
+        {% elif batch.status == 'imported' %}✅ Imported Successfully
+        {% else %}❌ Validation Failed — Fix & Re-upload{% endif %}
+      </div>
+      <div style="font-size:12px;color:var(--muted)">
+        <strong>{{ batch.filename }}</strong> · {{ batch.uploaded_at|date:"d M Y H:i" }} ·
+        <span class="pill pill-{% if batch.status == 'validated' or batch.status == 'imported' %}GREEN{% else %}RED{% endif %}">{{ batch.get_status_display }}</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <a href="{% url 'upload_file' %}" class="btn btn-outline btn-sm">← Upload Another</a>
+      {% if batch.status == 'validated' %}
+      <form method="POST" action="{% url 'import_batch' batch.id %}" onsubmit="return confirm('Import {{ batch.row_count }} records?')">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success">✅ Import {{ batch.row_count }} Records</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Stats -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+  <div class="kpi-tile"><div><div class="kpi-tile-label">Total Rows</div><div class="kpi-tile-value">{{ staging|length }}</div></div><span style="font-size:24px">📄</span></div>
+  <div class="kpi-tile"><div><div class="kpi-tile-label">Errors</div><div class="kpi-tile-value" style="color:{% if errors %}var(--red){% else %}var(--status-green){% endif %}">{{ errors|length }}</div></div><span style="font-size:24px">{% if errors %}❌{% else %}✅{% endif %}</span></div>
+  <div class="kpi-tile"><div><div class="kpi-tile-label">Error Types</div><div class="kpi-tile-value">{{ error_types|length }}</div></div><span style="font-size:24px">🔍</span></div>
+  <div class="kpi-tile"><div><div class="kpi-tile-label">Clean Rows</div><div class="kpi-tile-value" style="color:var(--status-green)">{{ batch.row_count }}</div></div><span style="font-size:24px">✓</span></div>
+</div>
+
+{% if errors %}
+<div style="background:var(--white);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:18px">
+  <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+    <div class="sec-title">⚠️ Validation Errors</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+      {% for etype,count in error_types.items %}
+      <span style="background:#FEE2E2;color:#991B1B;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700">
+        {{ etype }} <span style="background:#991B1B;color:#fff;padding:0 5px;border-radius:8px;margin-left:4px">{{ count }}</span>
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>Row</th><th>Field</th><th>Error Type</th><th>Message</th></tr></thead>
+    <tbody>
+      {% for e in errors %}
+      <tr>
+        <td><code style="background:#FEE2E2;color:#991B1B;padding:2px 7px;border-radius:4px;font-size:11px">Row {{ e.row_number }}</code></td>
+        <td><code style="background:var(--g100);color:var(--g800);padding:2px 7px;border-radius:4px;font-size:11px">{{ e.field_name|default:"—" }}</code></td>
+        <td style="font-size:11px;font-weight:700;color:#991B1B">{{ e.error_type }}</td>
+        <td style="font-size:12px">{{ e.message }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;font-size:13px;color:#78350F;margin-bottom:18px">
+  <strong>🛠 How to fix:</strong> Open your Excel file, correct the rows listed above, save, and re-upload.
+  Dates must be <code style="background:#FEF3C7;padding:1px 5px;border-radius:3px">YYYY-MM-DD</code>.
+  Integers must have no decimals. The combination of <code>week_number + season + field_id</code> must be unique.
+</div>
+{% endif %}
+
+{% if staging %}
+<div style="background:var(--white);border-radius:12px;box-shadow:var(--shadow);overflow:hidden">
+  <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+    <div class="sec-title">👁 Data Preview</div>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Row</th><th>Week</th><th>Season</th><th>Field</th><th>Crop</th>
+        <th>Planned</th><th>Actual</th><th>Labor</th><th>Qty</th><th>Target</th>
+      </tr></thead>
+      <tbody>
+        {% for row in staging %}
+        <tr>
+          <td style="font-size:11px;color:var(--muted)">{{ row.row_number }}</td>
+          <td>{{ row.week_label }}</td>
+          <td style="font-size:11px;color:var(--muted)">{{ row.season }}</td>
+          <td><strong>{{ row.field_name }}</strong></td>
+          <td>{{ row.crop }}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px">{{ row.planned_date }}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px">{{ row.actual_date }}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px">R{{ row.labor_cost }}</td>
+          <td style="font-weight:600">{{ row.qty_planted }}</td>
+          <td>{{ row.target_qty }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

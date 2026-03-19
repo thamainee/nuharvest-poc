@@ -1,0 +1,80 @@
+{% extends "planting/base.html" %}
+{% block title %}Alerts{% endblock %}
+{% block topbar_progress %}Alert Centre{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+  <div>
+    <div style="font-size:17px;font-weight:700;color:var(--g800)">🔔 Alerts & Notifications</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px">KPI threshold violations and system alerts</div>
+  </div>
+  <button class="btn btn-outline btn-sm" onclick="markAllRead()">✓ Mark all read</button>
+  <button class="btn btn-outline btn-sm" onclick="checkAlerts()" id="checkBtn">🔄 Check Now</button>
+  <button class="btn btn-outline btn-sm" onclick="sendAlertEmail()" style="border-color:#F59E0B;color:#B45309">📧 Email Alerts</button>
+</div>
+
+<div class="field-table-wrap">
+  <table>
+    <thead><tr>
+      <th>Severity</th><th>Title</th><th>Message</th><th>Field</th><th>KPI</th><th>Value</th><th>Time</th><th>Status</th>
+    </tr></thead>
+    <tbody>
+      {% for n in all_notifications %}
+      <tr style="{% if not n.is_read %}background:#FAFFF9{% endif %}">
+        <td>
+          {% if n.severity == 'critical' %}
+            <span class="pill pill-RED">🔴 Critical</span>
+          {% elif n.severity == 'warning' %}
+            <span class="pill pill-ORANGE">⚠️ Warning</span>
+          {% else %}
+            <span class="pill pill-GREEN">ℹ️ Info</span>
+          {% endif %}
+        </td>
+        <td style="font-weight:{% if not n.is_read %}600{% else %}400{% endif %}">{{ n.title }}</td>
+        <td style="font-size:12px;color:var(--muted)">{{ n.message }}</td>
+        <td style="font-size:12px">{{ n.field_name|default:"—" }}</td>
+        <td style="font-size:12px">{{ n.kpi_name|default:"—" }}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600">{{ n.kpi_value|default:"—" }}</td>
+        <td style="font-size:11px;color:var(--muted)">{{ n.created_at|timesince }} ago</td>
+        <td>
+          {% if n.is_read %}
+            <span style="font-size:11px;color:var(--muted)">Read</span>
+          {% else %}
+            <span style="font-size:11px;color:var(--status-green);font-weight:600">New</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">No alerts yet. They will appear here when KPI thresholds are breached.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function checkAlerts() {
+  const btn = document.getElementById('checkBtn');
+  btn.textContent = '⏳ Checking...'; btn.disabled = true;
+  fetch('/notifications/check/', { method:'POST', headers:{'X-CSRFToken':getCookie('csrftoken')} })
+    .then(r=>r.json())
+    .then(d=>{
+      btn.textContent='🔄 Check Now'; btn.disabled=false;
+      if (d.created > 0) {
+        showToast(`🔔 ${d.created} new alert(s) created`);
+        setTimeout(()=>location.reload(), 1500);
+      } else {
+        showToast(d.total_alerts > 0
+          ? `✅ Already up to date — ${d.red_count} RED, ${d.orange_count} ORANGE`
+          : '✅ All KPIs are within thresholds');
+      }
+    });
+}
+function sendAlertEmail() {
+  fetch('/notifications/send-email/', { method:'POST', headers:{'X-CSRFToken':getCookie('csrftoken')} })
+    .then(r=>r.json())
+    .then(d=>showToast(d.sent ? `📧 Email sent with ${d.alert_count} alert(s)` : `⚠️ ${d.reason}`));
+}
+</script>
+{% endblock %}

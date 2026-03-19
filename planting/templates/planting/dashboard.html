@@ -1,0 +1,304 @@
+{% extends "planting/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block topbar_progress %}{{ week_label }}{% endblock %}
+{% block topbar_season %}Season: {{ season }}{% endblock %}
+
+{% block content %}
+
+<!-- KPI Banner -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+  <div style="font-size:11px;color:var(--muted)">
+    Season: <strong>{{ season }}</strong> &nbsp;·&nbsp; {{ week_label }}
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-outline btn-sm" onclick="checkAlerts()" id="checkBtn">
+      🔄 Check Alerts
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="sendAlertEmail()"
+            style="border-color:#F59E0B;color:#B45309">
+      📧 Email Alerts
+    </button>
+  </div>
+</div>
+
+<!-- KPI Banner -->
+<div class="kpi-banner">
+  <div class="kpi-tile">
+    <div>
+      <div class="kpi-tile-label">Active Fields</div>
+      <div class="kpi-tile-value">{{ active_fields }}</div>
+      <div class="kpi-tile-sub">All planting areas</div>
+    </div>
+    <div class="kpi-tile-icon">🌾</div>
+  </div>
+  <div class="kpi-tile">
+    <div>
+      <div class="kpi-tile-label">Fields on Schedule</div>
+      <div class="kpi-tile-value" style="color:{% if fields_on_schedule == total_fields %}var(--status-green){% elif fields_on_schedule == 0 %}var(--red){% else %}var(--orange){% endif %}">
+        {{ fields_on_schedule }} / {{ total_fields }}
+      </div>
+      <div class="kpi-tile-sub">Against weekly program</div>
+    </div>
+    <div class="kpi-tile-icon">📅</div>
+  </div>
+  <div class="kpi-tile">
+    <div>
+      <div class="kpi-tile-label">Overall Qty Progress</div>
+      <div class="kpi-tile-value" style="color:{% if overall_pct >= 95 %}var(--status-green){% elif overall_pct >= 80 %}var(--orange){% else %}var(--red){% endif %}">
+        {{ overall_pct }}%
+      </div>
+      <div class="kpi-tile-sub">{{ total_qty_planted|floatformat:0 }} of {{ total_qty_target|floatformat:0 }} seedlings</div>
+    </div>
+    <div class="kpi-tile-icon">📈</div>
+  </div>
+  <div class="kpi-tile">
+    <div>
+      <div class="kpi-tile-label">Avg Cost / Seedling</div>
+      <div class="kpi-tile-value" style="color:{% if avg_cost <= 2.5 %}var(--status-green){% elif avg_cost <= 3.5 %}var(--orange){% else %}var(--red){% endif %}">
+        R{{ avg_cost }}
+      </div>
+      <div class="kpi-tile-sub">This week — all fields</div>
+    </div>
+    <div class="kpi-tile-icon">💰</div>
+  </div>
+</div>
+
+<!-- Threshold Legend -->
+<div class="threshold-bar">
+  <span class="th-label">KPI Thresholds:</span>
+  <span><span class="th-dot" style="background:#16A34A"></span>Cost &lt; R2.50</span>
+  <span><span class="th-dot" style="background:#F4A261"></span>Cost R2.50–R3.50</span>
+  <span><span class="th-dot" style="background:#E63946"></span>Cost &gt; R3.50</span>
+  <span style="margin-left:8px">·</span>
+  <span><span class="th-dot" style="background:#16A34A"></span>Schedule: Current week</span>
+  <span><span class="th-dot" style="background:#F4A261"></span>Schedule: 1 wk behind</span>
+  <span><span class="th-dot" style="background:#E63946"></span>Schedule: 2+ wks behind</span>
+  <span style="margin-left:8px">·</span>
+  <span><span class="th-dot" style="background:#16A34A"></span>Qty: ≥ 95%</span>
+  <span><span class="th-dot" style="background:#F4A261"></span>Qty: 80–95%</span>
+  <span><span class="th-dot" style="background:#E63946"></span>Qty: &lt; 80%</span>
+</div>
+
+<!-- Field KPI Status Table -->
+<div class="field-table-wrap">
+  <div style="padding:14px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div class="sec-title">Field KPI Status</div>
+      <div class="sec-sub" style="margin-top:2px">Live performance view — {{ week_label }}</div>
+    </div>
+    <span style="background:var(--g100);color:var(--g800);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700">
+      {{ active_fields }} Fields Active
+    </span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Block</th>
+        <th>Crop</th>
+        <th>Cost/Seedling (Wk)</th>
+        <th>Planting Schedule</th>
+        <th>Qty Progress</th>
+        <th>Target</th>
+        <th>Actual</th>
+        <th>Wk Labor</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in field_rows %}
+      <tr>
+        <td><strong>{{ row.field_name }}</strong></td>
+        <td style="color:var(--muted);font-size:12px">{{ row.block }}</td>
+        <td>{{ row.crop }}</td>
+        <td>
+          <span class="pill pill-{{ row.cost_status }}">R{{ row.cost_per_seedling }} / seedling</span>
+        </td>
+        <td>
+          <span class="pill pill-{{ row.schedule_status }}">{{ row.schedule_label }}</span>
+        </td>
+        <td style="min-width:140px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="pbar-bg" style="flex:1">
+              <div class="pbar-fill" style="width:{% if row.achievement_pct > 100 %}100{% else %}{{ row.achievement_pct|floatformat:0 }}{% endif %}%;background:{{ row.qty_colour }}"></div>
+            </div>
+            <span style="font-size:12px;font-weight:700;color:{{ row.qty_colour }};min-width:38px">{{ row.achievement_pct }}%</span>
+          </div>
+        </td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">{{ row.target_qty|floatformat:0 }}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600">{{ row.qty_planted|floatformat:0 }}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">R{{ row.labor_cost|floatformat:0 }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">
+          No data found. <a href="{% url 'upload_file' %}" style="color:var(--g700);font-weight:600">Upload data</a> to get started,
+          or <button onclick="loadInitialData()" style="background:none;border:none;color:var(--g700);font-weight:600;cursor:pointer;font-family:inherit;font-size:13px">load the sample Excel data</button>.
+        </td>
+      </tr>
+      {% endfor %}
+
+      {% if field_rows %}
+      <tr class="totals-row">
+        <td colspan="3">TOTALS / AVERAGES</td>
+        <td><span class="pill pill-{% if avg_cost <= 2.5 %}GREEN{% elif avg_cost <= 3.5 %}ORANGE{% else %}RED{% endif %}">R{{ avg_cost }} avg</span></td>
+        <td><span class="pill pill-{% if fields_on_schedule == total_fields %}GREEN{% elif fields_on_schedule > 0 %}ORANGE{% else %}RED{% endif %}">{{ fields_on_schedule }}/{{ total_fields }} on track</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="pbar-bg" style="flex:1">
+              <div class="pbar-fill" style="width:{% if overall_pct > 100 %}100{% else %}{{ overall_pct|floatformat:0 }}{% endif %}%;background:{% if overall_pct >= 95 %}#16A34A{% elif overall_pct >= 80 %}#F4A261{% else %}#E63946{% endif %}"></div>
+            </div>
+            <span style="font-size:12px;font-weight:700;min-width:38px">{{ overall_pct }}%</span>
+          </div>
+        </td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">{{ total_qty_target|floatformat:0 }}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px;font-weight:700">{{ total_qty_planted|floatformat:0 }}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">R{{ total_labor|floatformat:0 }}</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Charts Row -->
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-title">Actual vs Target Qty Planted</div>
+    <div class="chart-sub">Cumulative seedlings by field</div>
+    <canvas id="barChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Cost per Seedling — Weekly Trend</div>
+    <div class="chart-sub">R/seedling per week · dashed lines = thresholds</div>
+    <canvas id="trendChart"></canvas>
+  </div>
+</div>
+
+{% if not field_rows %}
+<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;font-size:13px;color:#78350F">
+  <strong>👋 First time setup:</strong> Click the button in the table above to load sample data, or go to
+  <a href="{% url 'upload_file' %}" style="color:var(--g700);font-weight:600">Upload Data</a> to import your own Excel file.
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const costTrend  = {{ cost_trend_json|safe }};
+const weekLabels = {{ week_labels_json|safe }};
+const fieldNames = {{ field_names_json|safe }};
+const barLabels  = {{ bar_labels_json|safe }};
+const barTargets = {{ bar_targets_json|safe }};
+const barActuals = {{ bar_actuals_json|safe }};
+
+const COLOURS = ['#2D9B56','#F4A261','#3B82F6','#8B5CF6','#EC4899','#F59E0B'];
+
+// ── Bar chart: Actual vs Target ───────────────────────────────────────────
+if (barLabels.length) {
+  new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: barLabels,
+      datasets: [
+        { label:'Target', data:barTargets, backgroundColor:'rgba(200,220,200,0.5)', borderRadius:4 },
+        { label:'Actual', data:barActuals, backgroundColor:'#2D9B56', borderRadius:4 }
+      ]
+    },
+    options: {
+      responsive:true,
+      plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, boxWidth:12 } } },
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{size:11}} },
+        y:{ grid:{color:'#f0f0f0'}, ticks:{font:{size:11}} }
+      }
+    }
+  });
+}
+
+// ── Line chart: Cost trend per field ─────────────────────────────────────
+if (weekLabels.length && fieldNames.length) {
+  const datasets = fieldNames.map((fn, i) => ({
+    label: fn,
+    data:  costTrend[fn] || [],
+    borderColor: COLOURS[i % COLOURS.length],
+    backgroundColor: 'transparent',
+    tension: 0.3, pointRadius: 4, pointHoverRadius: 6,
+    borderWidth: 2,
+  }));
+
+  // Threshold lines
+  datasets.push({
+    label:'R2.50 (Green)', data: Array(weekLabels.length).fill(2.50),
+    borderColor:'rgba(22,163,74,0.4)', borderDash:[5,4], borderWidth:1.5,
+    pointRadius:0, fill:false,
+  });
+  datasets.push({
+    label:'R3.50 (Orange)', data: Array(weekLabels.length).fill(3.50),
+    borderColor:'rgba(217,119,6,0.4)', borderDash:[5,4], borderWidth:1.5,
+    pointRadius:0, fill:false,
+  });
+
+  new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: { labels: weekLabels, datasets },
+    options: {
+      responsive:true,
+      plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, boxWidth:12, usePointStyle:true } } },
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{size:11}} },
+        y:{ grid:{color:'#f0f0f0'}, ticks:{font:{size:11}, callback:v=>'R'+v} }
+      }
+    }
+  });
+}
+
+// ── Check Alerts ─────────────────────────────────────────────────────────
+function checkAlerts() {
+  const btn = document.getElementById('checkBtn');
+  btn.textContent = '⏳ Checking...';
+  btn.disabled = true;
+  fetch('/notifications/check/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') }
+  })
+  .then(r => r.json())
+  .then(d => {
+    btn.textContent = '🔄 Check Alerts';
+    btn.disabled = false;
+    if (d.created > 0) {
+      showToast(`🔔 ${d.created} new alert(s) created — ${d.red_count} RED, ${d.orange_count} ORANGE`);
+      setTimeout(() => location.reload(), 2000);
+    } else if (d.total_alerts > 0) {
+      showToast(`✅ Alerts already up to date — ${d.red_count} RED, ${d.orange_count} ORANGE active`);
+    } else {
+      showToast('✅ All KPIs are within thresholds — no alerts');
+    }
+  });
+}
+
+function sendAlertEmail() {
+  fetch('/notifications/send-email/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') }
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.sent) {
+      showToast(`📧 Email sent with ${d.alert_count} alert(s)`);
+    } else {
+      showToast(`⚠️ Email not sent — ${d.reason}`);
+    }
+  });
+}
+function loadInitialData() {
+  if (!confirm('Load sample data from the Excel file into the database?')) return;
+  fetch('/load-initial-data/', { method:'POST', headers:{'X-CSRFToken':getCookie('csrftoken')} })
+    .then(r=>r.json())
+    .then(d=>{
+      if (d.error) { showToast('Error: '+d.error); return; }
+      showToast(`✅ Loaded ${d.created} records (${d.updated} updated). Refreshing...`);
+      setTimeout(()=>location.reload(), 1500);
+    });
+}
+</script>
+{% endblock %}

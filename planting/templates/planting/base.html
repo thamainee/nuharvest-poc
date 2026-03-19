@@ -1,0 +1,420 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NuHarvest — {% block title %}Dashboard{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --g900: #0a1f12; --g800: #1B4332; --g700: #2D6A4F; --g500: #40916C;
+      --g300: #95D5B2; --g100: #D8F3DC; --g50:  #F0FAF4;
+      --bg:   #F2F6F3; --white: #FFFFFF;
+      --text: #141f18; --muted: #5a7063; --border: #ddeee4;
+      --red: #DC2626; --orange: #D97706; --status-green: #16A34A;
+      --shadow: 0 1px 8px rgba(10,31,18,0.08);
+      --shadow-md: 0 4px 20px rgba(10,31,18,0.10);
+    }
+    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); display:flex; min-height:100vh; }
+
+    /* ── Sidebar ─────────────────────────────────────────────────────────── */
+    .sidebar {
+      width:200px; min-height:100vh; background:var(--g800);
+      display:flex; flex-direction:column;
+      position:fixed; top:0; left:0; bottom:0; z-index:200;
+    }
+    .sb-logo {
+      padding:20px 18px 16px;
+      border-bottom:1px solid rgba(255,255,255,0.07);
+    }
+    .sb-logo-mark {
+      display:flex; align-items:center; gap:9px;
+    }
+    .sb-icon {
+      width:34px; height:34px; background:var(--g300); border-radius:8px;
+      display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;
+    }
+    .sb-name { font-size:16px; font-weight:700; color:#fff; letter-spacing:-0.3px; }
+    .sb-sub  { font-size:10px; color:rgba(255,255,255,0.45); margin-top:2px; letter-spacing:0.2px; }
+
+    .sb-section {
+      padding:18px 18px 6px;
+      font-size:9px; font-weight:700; letter-spacing:1.2px;
+      color:rgba(255,255,255,0.3); text-transform:uppercase;
+    }
+    .nav-item {
+      display:flex; align-items:center; gap:10px;
+      padding:9px 18px; margin:1px 8px; border-radius:7px;
+      color:rgba(255,255,255,0.6); text-decoration:none;
+      font-size:13px; font-weight:500; transition:all 0.15s;
+      position:relative;
+    }
+    .nav-item:hover { background:rgba(255,255,255,0.07); color:#fff; }
+    .nav-item.active { background:var(--g300); color:var(--g800); font-weight:700; }
+    .nav-item .ni    { font-size:15px; width:18px; text-align:center; }
+    .nav-badge {
+      margin-left:auto; background:var(--red); color:#fff;
+      font-size:10px; font-weight:700; min-width:18px; height:18px;
+      border-radius:9px; display:flex; align-items:center; justify-content:center;
+      padding:0 5px;
+    }
+
+    .sb-footer {
+      margin-top:auto; padding:14px 8px;
+      border-top:1px solid rgba(255,255,255,0.07);
+    }
+    .sb-user {
+      display:flex; align-items:center; gap:9px;
+      padding:8px 12px; border-radius:8px;
+    }
+    .sb-avatar {
+      width:30px; height:30px; border-radius:50%;
+      background:var(--g300); color:var(--g800);
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; font-weight:700; flex-shrink:0;
+    }
+    .sb-uname  { font-size:12px; font-weight:600; color:#fff; }
+    .sb-urole  { font-size:10px; color:rgba(255,255,255,0.4); }
+    .sb-logout {
+      display:block; text-align:center; margin:6px 10px 0;
+      padding:7px; border-radius:7px;
+      color:rgba(255,255,255,0.4); font-size:12px; text-decoration:none;
+      transition:all 0.15s;
+    }
+    .sb-logout:hover { background:rgba(255,255,255,0.06); color:#fff; }
+
+    /* ── Main ────────────────────────────────────────────────────────────── */
+    .main-wrap { margin-left:200px; flex:1; display:flex; flex-direction:column; min-height:100vh; }
+
+    /* ── Topbar ──────────────────────────────────────────────────────────── */
+    .topbar {
+      background:var(--g800); color:#fff;
+      padding:0 24px; height:56px;
+      display:flex; align-items:center; gap:16px;
+      position:sticky; top:0; z-index:100;
+    }
+    .topbar-left { flex:1; }
+    .topbar-prog-label { font-size:10px; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.8px; }
+    .topbar-prog-value { font-size:14px; font-weight:700; color:#fff; }
+    .topbar-season     { font-size:12px; color:var(--g300); margin-left:12px; }
+
+    .topbar-right { display:flex; align-items:center; gap:12px; }
+
+    /* Notification bell */
+    .notif-bell {
+      position:relative; cursor:pointer;
+      width:36px; height:36px; border-radius:8px;
+      background:rgba(255,255,255,0.08);
+      display:flex; align-items:center; justify-content:center;
+      font-size:16px; transition:background 0.15s; border:none; color:#fff;
+    }
+    .notif-bell:hover { background:rgba(255,255,255,0.15); }
+    .notif-dot {
+      position:absolute; top:6px; right:6px;
+      width:8px; height:8px; border-radius:50%;
+      background:var(--red); border:2px solid var(--g800);
+    }
+
+    /* Notification panel */
+    .notif-panel {
+      position:fixed; top:56px; right:0;
+      width:360px; max-height:calc(100vh - 56px);
+      background:#fff; box-shadow:-4px 0 24px rgba(0,0,0,0.15);
+      z-index:300; display:none; flex-direction:column;
+      border-left:1px solid var(--border);
+    }
+    .notif-panel.open { display:flex; }
+    .notif-panel-head {
+      padding:16px 18px; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .notif-panel-head h3 { font-size:14px; font-weight:700; }
+    .notif-mark-all {
+      font-size:12px; color:var(--g700); cursor:pointer;
+      background:none; border:none; font-family:inherit; font-weight:600;
+    }
+    .notif-list { overflow-y:auto; flex:1; }
+    .notif-item {
+      padding:13px 18px; border-bottom:1px solid var(--border);
+      display:flex; gap:11px; align-items:flex-start;
+      transition:background 0.1s; cursor:pointer;
+    }
+    .notif-item:hover { background:var(--g50); }
+    .notif-item.unread { background:#FAFFF9; }
+    .notif-sev {
+      width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0;
+    }
+    .sev-critical { background:var(--red); }
+    .sev-warning  { background:var(--orange); }
+    .sev-info     { background:var(--status-green); }
+    .notif-title  { font-size:13px; font-weight:600; margin-bottom:2px; }
+    .notif-msg    { font-size:12px; color:var(--muted); line-height:1.4; }
+    .notif-time   { font-size:10px; color:#bbb; margin-top:4px; }
+    .notif-empty  { padding:40px; text-align:center; color:var(--muted); font-size:13px; }
+
+    /* ── Page content ────────────────────────────────────────────────────── */
+    .page-body { padding:22px 24px; flex:1; }
+
+    /* ── KPI Banner (top 4 cards) ────────────────────────────────────────── */
+    .kpi-banner {
+      display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px;
+    }
+    .kpi-tile {
+      background:var(--white); border-radius:12px;
+      padding:16px 18px; box-shadow:var(--shadow);
+      display:flex; justify-content:space-between; align-items:flex-start;
+    }
+    .kpi-tile-label { font-size:11px; color:var(--muted); font-weight:500; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.4px; }
+    .kpi-tile-value { font-size:26px; font-weight:800; color:var(--g800); line-height:1; }
+    .kpi-tile-sub   { font-size:12px; color:var(--muted); margin-top:4px; }
+    .kpi-tile-icon  { font-size:28px; opacity:0.7; }
+
+    /* ── Threshold legend ────────────────────────────────────────────────── */
+    .threshold-bar {
+      background:var(--white); border-radius:10px;
+      padding:10px 16px; margin-bottom:16px;
+      display:flex; align-items:center; gap:20px; flex-wrap:wrap;
+      box-shadow:var(--shadow); font-size:11px;
+    }
+    .th-label { font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-right:4px; }
+    .th-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
+
+    /* ── Section header ──────────────────────────────────────────────────── */
+    .sec-head {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:12px;
+    }
+    .sec-title {
+      font-size:13px; font-weight:700; color:var(--g800);
+      display:flex; align-items:center; gap:7px;
+    }
+    .sec-sub { font-size:11px; color:var(--muted); font-weight:400; }
+
+    /* ── Field KPI Table ─────────────────────────────────────────────────── */
+    .field-table-wrap {
+      background:var(--white); border-radius:12px;
+      box-shadow:var(--shadow); overflow:hidden; margin-bottom:18px;
+    }
+    table { width:100%; border-collapse:collapse; }
+    thead tr { background:var(--g50); }
+    th { padding:10px 14px; text-align:left; font-size:11px; font-weight:700;
+         color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
+    td { padding:11px 14px; border-bottom:1px solid var(--border); font-size:13px; }
+    tr:last-child td { border-bottom:none; }
+    tr.totals-row td { font-weight:700; background:var(--g50); font-size:13px; }
+    tr:not(.totals-row):hover td { background:#f9fdf9; }
+
+    /* status pill */
+    .pill {
+      display:inline-flex; align-items:center; gap:5px;
+      padding:3px 10px; border-radius:20px;
+      font-size:11px; font-weight:700; white-space:nowrap;
+    }
+    .pill::before { content:'●'; font-size:7px; }
+    .pill-GREEN  { background:#DCFCE7; color:#166534; }
+    .pill-ORANGE { background:#FEF9C3; color:#854D0E; }
+    .pill-RED    { background:#FEE2E2; color:#991B1B; }
+
+    /* progress bar */
+    .pbar-bg   { background:#e8f5e9; border-radius:3px; height:6px; min-width:80px; }
+    .pbar-fill { height:6px; border-radius:3px; }
+
+    /* ── Charts row ──────────────────────────────────────────────────────── */
+    .charts-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:18px; }
+    .chart-card {
+      background:var(--white); border-radius:12px;
+      padding:18px 20px; box-shadow:var(--shadow);
+    }
+    .chart-card canvas { max-height:230px; }
+    .chart-title { font-size:13px; font-weight:700; color:var(--g800); margin-bottom:3px; }
+    .chart-sub   { font-size:11px; color:var(--muted); margin-bottom:14px; }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────── */
+    .btn {
+      display:inline-flex; align-items:center; gap:6px;
+      padding:8px 16px; border-radius:7px; border:none;
+      font-family:inherit; font-size:13px; font-weight:600;
+      cursor:pointer; text-decoration:none; transition:all 0.15s;
+    }
+    .btn-primary { background:var(--g800); color:#fff; }
+    .btn-primary:hover { background:var(--g700); }
+    .btn-success { background:#16A34A; color:#fff; }
+    .btn-success:hover { background:#15803D; }
+    .btn-outline { background:transparent; border:1.5px solid var(--border); color:var(--text); }
+    .btn-outline:hover { border-color:var(--g700); color:var(--g800); }
+    .btn-sm { padding:5px 12px; font-size:12px; }
+
+    /* ── Django messages ─────────────────────────────────────────────────── */
+    .dj-msg { padding:11px 15px; border-radius:8px; font-size:13px; margin-bottom:14px; }
+    .dj-msg.success { background:#DCFCE7; color:#166534; border:1px solid #BBF7D0; }
+    .dj-msg.error   { background:#FEE2E2; color:#991B1B; border:1px solid #FECACA; }
+
+    /* ── Role badge ──────────────────────────────────────────────────────── */
+    .role-badge {
+      display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700;
+    }
+    .role-admin   { background:#DBEAFE; color:#1E40AF; }
+    .role-manager { background:#DCFCE7; color:#166534; }
+    .role-viewer  { background:#FEF9C3; color:#854D0E; }
+
+    /* ── Toast ───────────────────────────────────────────────────────────── */
+    #toast {
+      position:fixed; bottom:20px; right:20px;
+      background:var(--g800); color:#fff;
+      padding:12px 18px; border-radius:9px; font-size:13px;
+      display:none; z-index:9999; box-shadow:var(--shadow-md);
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Sidebar ────────────────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-mark">
+      <div class="sb-icon">🌱</div>
+      <div>
+        <div class="sb-name">NuHarvest</div>
+        <div class="sb-sub">Planting Operations</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sb-section">Menu</div>
+  <a href="{% url 'dashboard' %}"   class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+    <span class="ni">📊</span> Dashboard
+  </a>
+  <a href="{% url 'upload_file' %}" class="nav-item {% if active_page == 'upload' %}active{% endif %}">
+    <span class="ni">📤</span> Upload Data
+  </a>
+  <a href="{% url 'manage_uploads' %}" class="nav-item {% if active_page == 'manage' %}active{% endif %}">
+    <span class="ni">📁</span> Manage Files
+  </a>
+  <a href="{% url 'notifications' %}" class="nav-item {% if active_page == 'notifications' %}active{% endif %}">
+    <span class="ni">🔔</span> Alerts
+    {% if unread_count > 0 %}<span class="nav-badge">{{ unread_count }}</span>{% endif %}
+  </a>
+
+  <div class="sb-footer">
+    <div class="sb-user">
+      <div class="sb-avatar">{{ request.user.username|slice:":2"|upper }}</div>
+      <div>
+        <div class="sb-uname">{{ request.user.username }}</div>
+        <div class="sb-urole">
+          {% if request.user.profile %}
+            {{ request.user.profile.get_role_display }}
+            {% if request.user.profile.department %}
+              · {{ request.user.profile.department.name }}
+            {% endif %}
+          {% else %}User{% endif %}
+        </div>
+      </div>
+    </div>
+    <a href="{% url 'logout' %}" class="sb-logout">⎋ Sign out</a>
+  </div>
+</aside>
+
+<!-- ── Main ───────────────────────────────────────────────────────────────── -->
+<div class="main-wrap">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-prog-label">Program Progress</div>
+      <span class="topbar-prog-value">{% block topbar_progress %}—{% endblock %}</span>
+      <span class="topbar-season">{% block topbar_season %}{% endblock %}</span>
+    </div>
+    <div class="topbar-right">
+      <!-- Notification Bell -->
+      <button class="notif-bell" onclick="toggleNotifPanel()" title="Alerts">
+        🔔
+        {% if unread_count > 0 %}<span class="notif-dot"></span>{% endif %}
+      </button>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5)">
+        {% if request.user.profile and request.user.profile.department %}
+          <span style="background:rgba(255,255,255,0.1);padding:3px 10px;border-radius:6px">
+            {{ request.user.profile.department.name }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Panel (slide in from right) -->
+  <div class="notif-panel" id="notifPanel">
+    <div class="notif-panel-head">
+      <h3>🔔 Alerts & Notifications</h3>
+      <button class="notif-mark-all" onclick="markAllRead()">Mark all read</button>
+    </div>
+    <div class="notif-list" id="notifList">
+      {% if notifications %}
+        {% for n in notifications %}
+        <div class="notif-item unread" id="notif-{{ n.id }}" onclick="markRead({{ n.id }})">
+          <div class="notif-sev sev-{{ n.severity }}"></div>
+          <div>
+            <div class="notif-title">{{ n.title }}</div>
+            <div class="notif-msg">{{ n.message }}</div>
+            <div class="notif-time">{{ n.created_at|timesince }} ago
+              {% if n.kpi_value %} · <strong>{{ n.kpi_value }}</strong>{% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="notif-empty">✅ No unread alerts</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Page body -->
+  <div class="page-body">
+    {% if messages %}
+      {% for msg in messages %}
+      <div class="dj-msg {{ msg.tags }}">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+function getCookie(n) { const v=document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)'); return v?v.pop():''; }
+function showToast(msg,dur=4000) {
+  const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+  setTimeout(()=>t.style.display='none',dur);
+}
+
+let panelOpen = false;
+function toggleNotifPanel() {
+  panelOpen = !panelOpen;
+  document.getElementById('notifPanel').classList.toggle('open', panelOpen);
+}
+document.addEventListener('click', e => {
+  if (panelOpen && !e.target.closest('#notifPanel') && !e.target.closest('.notif-bell')) {
+    panelOpen = false;
+    document.getElementById('notifPanel').classList.remove('open');
+  }
+});
+
+function markRead(id) {
+  fetch(`/notifications/${id}/read/`, { method:'POST', headers:{'X-CSRFToken':getCookie('csrftoken')} })
+    .then(()=>{ document.getElementById('notif-'+id).style.opacity='0.4'; });
+}
+function markAllRead() {
+  fetch('/notifications/mark-all-read/', { method:'POST', headers:{'X-CSRFToken':getCookie('csrftoken')} })
+    .then(()=>{
+      document.querySelectorAll('.notif-item').forEach(el=>el.style.opacity='0.4');
+      document.getElementById('notifList').innerHTML='<div class="notif-empty">✅ All caught up!</div>';
+      showToast('All alerts marked as read');
+    });
+}
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

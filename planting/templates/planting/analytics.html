@@ -1,0 +1,52 @@
+{% extends "planting/base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+
+{% block content %}
+
+{% if records %}
+<div class="card mb-24">
+  <div class="section-title" style="margin-bottom:16px">📊 All Imported Planting Records</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Week</th><th>Date</th><th>Crop</th>
+        <th>Labor Cost (R)</th><th>Qty Planted</th><th>Target Qty</th>
+        <th>Cost/Seedling</th><th>Achievement</th><th>Notes</th>
+      </tr></thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td>{{ r.week }}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:12px">{{ r.date }}</td>
+          <td><strong>{{ r.crop }}</strong></td>
+          <td>{{ r.labor_cost }}</td>
+          <td>{{ r.qty_planted }}</td>
+          <td>{{ r.target_qty }}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:12px">
+            {% if r.qty_planted > 0 %}R{% widthratio r.labor_cost r.qty_planted 1 %}{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if r.target_qty > 0 %}
+              {% widthratio r.qty_planted r.target_qty 100 %}%
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:12px;color:var(--text-muted)">{{ r.notes|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:64px">
+  <div style="font-size:48px;margin-bottom:16px">📤</div>
+  <div style="font-size:18px;font-weight:700;color:var(--green-dark);margin-bottom:8px">No data imported yet</div>
+  <div style="font-size:14px;color:var(--text-muted);margin-bottom:20px">
+    Upload and import an Excel file to see your planting records here.
+  </div>
+  <a href="{% url 'upload_file' %}" class="btn btn-primary">📤 Upload Data</a>
+</div>
+{% endif %}
+
+{% endblock %}

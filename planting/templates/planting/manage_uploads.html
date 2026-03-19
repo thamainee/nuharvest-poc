@@ -1,0 +1,219 @@
+{% extends "planting/base.html" %}
+{% block title %}Manage Uploads{% endblock %}
+{% block topbar_progress %}Manage Uploads{% endblock %}
+
+{% block content %}
+
+<!-- Page Header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+  <div>
+    <div style="font-size:17px;font-weight:700;color:var(--g800)">📁 Manage Upload Files</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px">
+      View, re-upload, or delete uploaded files and their imported records
+    </div>
+  </div>
+  <a href="{% url 'upload_file' %}" class="btn btn-primary">+ Upload New File</a>
+</div>
+
+{% if batches %}
+<div style="background:var(--white);border-radius:12px;box-shadow:var(--shadow);overflow:hidden">
+  <table>
+    <thead>
+      <tr>
+        <th>File Name</th>
+        <th>Uploaded By</th>
+        <th>Date</th>
+        <th>Rows in File</th>
+        <th>Live Records</th>
+        <th>Status</th>
+        <th style="text-align:center">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in batches %}
+      {% with b=item.batch %}
+      <tr>
+        <!-- File name -->
+        <td>
+          <div style="font-weight:600;font-size:13px">{{ b.filename }}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">
+            ID #{{ b.id }}
+            {% if b.department %} · {{ b.department.name }}{% endif %}
+          </div>
+        </td>
+
+        <!-- Uploaded by -->
+        <td style="font-size:12px;color:var(--muted)">
+          {{ b.uploaded_by.username|default:"—" }}
+        </td>
+
+        <!-- Date -->
+        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">
+          {{ b.uploaded_at|date:"d M Y" }}<br>
+          <span style="color:#bbb">{{ b.uploaded_at|date:"H:i" }}</span>
+        </td>
+
+        <!-- Rows in file -->
+        <td style="font-weight:600;font-size:13px">
+          {{ b.row_count }}
+          <div style="font-size:11px;color:var(--muted);font-weight:400">staging rows</div>
+        </td>
+
+        <!-- Live records -->
+        <td>
+          {% if b.status == "imported" %}
+            <span style="font-weight:700;color:var(--status-green);font-size:13px">
+              {{ item.live_count }}
+            </span>
+            <div style="font-size:11px;color:var(--muted)">in database</div>
+          {% else %}
+            <span style="color:var(--muted);font-size:12px">—</span>
+          {% endif %}
+        </td>
+
+        <!-- Status -->
+        <td>
+          <span class="pill
+            {% if b.status == 'imported' %}pill-GREEN
+            {% elif b.status == 'validated' %}pill-ORANGE
+            {% elif b.status == 'errors' %}pill-RED
+            {% else %}pill-ORANGE{% endif %}">
+            {{ b.get_status_display }}
+          </span>
+        </td>
+
+        <!-- Actions -->
+        <td style="text-align:center">
+          <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+
+            <!-- View result -->
+            <a href="{% url 'upload_result' b.id %}" class="btn btn-outline btn-sm"
+               title="View validation result and data preview">
+              👁 View
+            </a>
+
+            <!-- Re-upload (update records) -->
+            {% if b.status == "imported" %}
+            <form method="POST" action="{% url 'reupload_batch' b.id %}" style="display:inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline btn-sm"
+                      style="border-color:#F59E0B;color:#B45309"
+                      title="Upload a corrected file to update these records">
+                🔄 Update
+              </button>
+            </form>
+            {% endif %}
+
+            <!-- Delete -->
+            <button class="btn btn-sm"
+                    style="background:#FEE2E2;color:#991B1B;border:none"
+                    onclick="confirmDelete({{ b.id }}, '{{ b.filename|escapejs }}', {{ item.has_live|yesno:'true,false' }}, {{ item.live_count }})"
+                    title="Delete this upload record">
+              🗑 Delete
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% else %}
+<div style="background:var(--white);border-radius:12px;box-shadow:var(--shadow);
+            padding:60px;text-align:center">
+  <div style="font-size:40px;margin-bottom:14px">📭</div>
+  <div style="font-size:16px;font-weight:700;color:var(--g800);margin-bottom:6px">No uploads yet</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:20px">
+    Upload your first Excel file to get started.
+  </div>
+  <a href="{% url 'upload_file' %}" class="btn btn-primary">📤 Upload File</a>
+</div>
+{% endif %}
+
+<!-- Delete confirmation modal -->
+<div id="deleteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);
+     z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:28px 32px;max-width:440px;width:90%;
+              box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="font-size:18px;font-weight:700;margin-bottom:6px">🗑 Delete Upload</div>
+    <div id="modalFileName" style="font-size:13px;color:var(--muted);margin-bottom:20px"></div>
+
+    <div id="liveDataQuestion" style="display:none">
+      <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;
+                  padding:14px;margin-bottom:16px;font-size:13px">
+        <strong>⚠️ This file has live records in the database.</strong><br>
+        <span id="liveCountText" style="color:var(--muted)"></span>
+      </div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px">What do you want to delete?</div>
+      <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;cursor:pointer">
+        <input type="radio" name="deleteChoice" value="file_only" checked style="margin-top:2px">
+        <div>
+          <div style="font-weight:600">Delete file record only</div>
+          <div style="font-size:12px;color:var(--muted)">The upload history is removed but the imported planting records stay in the database and remain visible on the dashboard.</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+        <input type="radio" name="deleteChoice" value="file_and_records" style="margin-top:2px">
+        <div>
+          <div style="font-weight:600;color:#991B1B">Delete file AND all its records</div>
+          <div style="font-size:12px;color:var(--muted)">Both the upload history AND the imported planting records are permanently removed. The dashboard will no longer show this data.</div>
+        </div>
+      </label>
+    </div>
+
+    <div id="simpleDeleteMsg" style="font-size:13px;color:var(--muted);margin-bottom:16px">
+      This will remove the upload record. No live data will be affected (this file was never imported).
+    </div>
+
+    <form id="deleteForm" method="POST" action="">
+      {% csrf_token %}
+      <input type="hidden" name="delete_live" id="deleteLiveInput" value="no">
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn"
+                style="background:#DC2626;color:#fff"
+                id="confirmDeleteBtn">🗑 Confirm Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete(batchId, filename, hasLive, liveCount) {
+  document.getElementById('deleteModal').style.display = 'flex';
+  document.getElementById('modalFileName').textContent = '📄 ' + filename;
+  document.getElementById('deleteForm').action = '/upload/delete/' + batchId + '/';
+
+  if (hasLive && liveCount > 0) {
+    document.getElementById('liveDataQuestion').style.display = 'block';
+    document.getElementById('simpleDeleteMsg').style.display  = 'none';
+    document.getElementById('liveCountText').textContent =
+      liveCount + ' planting record(s) in the database came from this file.';
+  } else {
+    document.getElementById('liveDataQuestion').style.display = 'none';
+    document.getElementById('simpleDeleteMsg').style.display  = 'block';
+  }
+}
+
+function closeModal() {
+  document.getElementById('deleteModal').style.display = 'none';
+  document.querySelectorAll('input[name="deleteChoice"]').forEach(r => r.checked = r.value === 'file_only');
+}
+
+document.getElementById('deleteForm').addEventListener('submit', function() {
+  const choice = document.querySelector('input[name="deleteChoice"]:checked');
+  document.getElementById('deleteLiveInput').value =
+    (choice && choice.value === 'file_and_records') ? 'yes' : 'no';
+});
+
+// Close modal clicking outside
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+{% endblock %}
