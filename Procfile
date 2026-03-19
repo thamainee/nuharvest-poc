@@ -1,0 +1,1 @@
+web: gunicorn agricult_project.wsgi
