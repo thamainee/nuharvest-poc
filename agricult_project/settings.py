@@ -48,6 +48,8 @@ DATABASES = {
 }
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 STATIC_URL = '/static/'
 MEDIA_URL  = '/media/'
